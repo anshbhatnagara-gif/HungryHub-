@@ -101,6 +101,40 @@ c:\HungryHub/
 
 ---
 
+## Deployment Strategy (Live Server Hosting)
+
+> [!IMPORTANT]
+> **Is it the right time to deploy? YES.**
+> Deploying now is the correct next step because it allows us to test real-world scenarios (network latency, live MySQL database connections, and WebSockets) and provides a secure `https://` environment required by third-party APIs like Razorpay and Google OAuth.
+
+To launch HungryHub as a live SaaS product, we will use a **Multi-Tier Cloud Deployment Architecture**:
+
+### 1. Database Tier (MySQL)
+- **Option A (Recommended):** **Aiven / PlanetScale / AWS RDS**
+  - We will provision a managed MySQL database in the cloud.
+  - The `schema.sql` and `seed.sql` will be executed there.
+  - *Why?* Better security, daily backups, and no need to manage the DB server manually.
+
+### 2. Backend API & WebSockets (Node.js)
+- **Option A:** **Render.com (Web Service)**
+  - Easiest setup for Node.js + Socket.io with automatic HTTPS.
+  - Connects directly to our GitHub repo to auto-deploy on every `git push`.
+- **Option B:** **AWS EC2 / DigitalOcean Droplet (Docker)**
+  - We will SSH into a Linux VPS, install Docker, and run our `docker-compose.yml`.
+  - *Why?* More control over the server environment.
+
+### 3. Frontend Web App (React/Vite)
+- **Platform:** **Vercel / Netlify**
+  - We will connect the GitHub repository to Vercel.
+  - Vercel will automatically build the React app (`npm run build`) and host it on a global CDN.
+  - *Why?* Lightning fast, free for frontend, auto-SSL, and continuous integration.
+
+## Open Questions for Deployment
+1. **Cloud Provider Preference**: Do you want to use simpler Platform-as-a-Service (Render + Vercel) or do you have an AWS/DigitalOcean account where you want everything hosted?
+2. **Domain Name**: Do you already own a domain name (like `hungryhub.com`) that we should connect?
+
+---
+
 ## Verification Plan
 
 ### Automated Tests
