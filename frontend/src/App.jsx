@@ -59,7 +59,7 @@ export default function App() {
   };
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <div className="flex flex-col min-h-screen bg-stone-50 text-stone-900 dark:bg-zinc-950 dark:text-stone-100 transition-colors duration-300">
         <Navbar theme={theme} toggleTheme={toggleTheme} />
         
