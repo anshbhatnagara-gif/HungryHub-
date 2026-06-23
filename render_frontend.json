@@ -1,0 +1,26 @@
+{
+  "type": "static_site",
+  "name": "hungryhub-frontend",
+  "ownerId": "tea-d8tefkhkh4rs73bva2h0",
+  "repo": "https://github.com/anshbhatnagara-gif/HungryHub-",
+  "autoDeploy": "yes",
+  "branch": "main",
+  "serviceDetails": {
+    "buildCommand": "cd frontend && npm install && npm run build",
+    "publishPath": "frontend/dist",
+    "pullRequestPreviewsEnabled": "no",
+    "routes": [
+      {
+        "type": "rewrite",
+        "source": "/*",
+        "destination": "/index.html"
+      }
+    ],
+    "envVars": [
+      {
+        "key": "VITE_API_URL",
+        "value": "https://hungryhub-api-itpc.onrender.com"
+      }
+    ]
+  }
+}

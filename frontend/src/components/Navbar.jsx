@@ -23,7 +23,7 @@ export default function Navbar({ theme, toggleTheme }) {
   // Developer Quick Logins
   const quickLogin = async (roleEmail) => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: roleEmail, password: 'password123' })

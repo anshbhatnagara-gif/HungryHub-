@@ -81,7 +81,8 @@ export const register = async (req, res) => {
       user: { id: userId, name, email, role: role || 'customer', referralCode, loyaltyPoints: referred_by ? 50 : 0 }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
 

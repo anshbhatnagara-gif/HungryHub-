@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
   const handleExportCSV = async () => {
     try {
-      const response = await fetch('/api/admin/export', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/export`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('hh_token')}` }
       });
       const blob = await response.blob();
