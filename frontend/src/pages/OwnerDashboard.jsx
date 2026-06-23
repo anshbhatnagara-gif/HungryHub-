@@ -62,7 +62,7 @@ export default function OwnerDashboard() {
   useEffect(() => {
     if (!restaurant) return;
 
-    const socket = io('http://localhost:5000', {
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
       transports: ['websocket', 'polling']
     });
     socket.emit('join_role', 'owner');
@@ -88,7 +88,7 @@ export default function OwnerDashboard() {
         body: JSON.stringify({ orderId, status })
       });
       // Fire socket update event
-      const socket = io('http://localhost:5000');
+      const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
       socket.emit('status_change', {
         orderId,
         status,

@@ -24,7 +24,9 @@ export const useApi = () => {
       }
 
       try {
-        const response = await fetch(url, {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const fullUrl = url.startsWith('/api') ? `${baseUrl}${url}` : url;
+        const response = await fetch(fullUrl, {
           ...options,
           headers,
         });
