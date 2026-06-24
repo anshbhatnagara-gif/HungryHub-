@@ -51,7 +51,9 @@ export const checkout = async (req, res) => {
     payment_method,
     payment_id,
     coupon_code,
-    delivery_address
+    delivery_address,
+    latitude,
+    longitude
   } = req.body;
 
   if (!restaurant_id || !items || items.length === 0 || !payable_amount || !delivery_address) {
@@ -83,10 +85,10 @@ export const checkout = async (req, res) => {
     const payStatus = (payment_method === 'cod') ? 'pending' : 'completed';
     const [result] = await db.query(
       `INSERT INTO orders (user_id, restaurant_id, subtotal, delivery_fee, tax, discount_amount, payable_amount,
-                           payment_method, payment_status, order_status, delivery_address, coupon_code, payment_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           payment_method, payment_status, order_status, delivery_address, latitude, longitude, coupon_code, payment_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.user.id, restaurant_id, subtotal, delivery_fee, tax, discount_amount, payable_amount,
-       payment_method, payStatus, 'placed', delivery_address, coupon_code || null, payment_id || null]
+       payment_method, payStatus, 'placed', delivery_address, latitude || null, longitude || null, coupon_code || null, payment_id || null]
     );
 
     const orderId = result.insertId;
@@ -174,6 +176,7 @@ export const getOrderDetails = async (req, res) => {
     let enrichedItems = items || [];
     let restaurant = null;
     let rider = null;
+    let routeHistory = [];
 
     if (db.isMock()) {
       enrichedItems = mockDB.order_items.filter(oi => oi.order_id === Number(id)).map(oi => {
@@ -192,6 +195,7 @@ export const getOrderDetails = async (req, res) => {
           rider = { ...rDetails, name: user ? user.name : 'Alex Rider', phone: user ? user.phone : 'Rider Phone' };
         }
       }
+      routeHistory = (mockDB.route_history || []).filter(h => h.order_id === Number(id));
     } else {
       const [restRes] = await db.query('SELECT * FROM restaurants WHERE id = ?', [order.restaurant_id]);
       restaurant = restRes[0];
@@ -202,13 +206,16 @@ export const getOrderDetails = async (req, res) => {
            WHERE r.id = ?`, [order.rider_id]);
         rider = riderRes[0];
       }
+      const [routeRes] = await db.query('SELECT latitude, longitude, created_at FROM route_history WHERE order_id = ? ORDER BY created_at ASC', [id]);
+      routeHistory = routeRes || [];
     }
 
     res.status(200).json({
       order,
       items: enrichedItems,
       restaurant,
-      rider
+      rider,
+      routeHistory
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -278,7 +285,7 @@ export const restaurantUpdateStatus = async (req, res) => {
 export const riderGetAvailableOrders = async (req, res) => {
   try {
     const [orders] = await db.query(
-      `SELECT o.*, r.name as restaurant_name, r.address as restaurant_address FROM orders o
+      `SELECT o.*, r.name as restaurant_name, r.address as restaurant_address, r.latitude as restaurant_latitude, r.longitude as restaurant_longitude FROM orders o
        JOIN restaurants r ON o.restaurant_id = r.id
        WHERE o.order_status = 'ready' AND o.rider_id IS NULL ORDER BY o.created_at ASC`, []
     );
@@ -290,7 +297,9 @@ export const riderGetAvailableOrders = async (req, res) => {
         return {
           ...o,
           restaurant_name: r ? r.name : ' Napoli Pizzeria',
-          restaurant_address: r ? r.address : '45 Corso Roma'
+          restaurant_address: r ? r.address : '45 Corso Roma',
+          restaurant_latitude: r ? r.latitude : 12.9730,
+          restaurant_longitude: r ? r.longitude : 77.5960
         };
       });
       return res.status(200).json(enriched);
@@ -407,18 +416,53 @@ export const riderGetEarnings = async (req, res) => {
        WHERE o.rider_id = ? AND o.order_status = 'delivered' ORDER BY o.updated_at DESC`, [rider.id]
     );
 
+    // Fetch active order for rider (if any)
+    const [active] = await db.query(
+      `SELECT o.*, r.name as restaurant_name, r.address as restaurant_address, r.latitude as restaurant_latitude, r.longitude as restaurant_longitude
+       FROM orders o
+       JOIN restaurants r ON o.restaurant_id = r.id
+       WHERE o.rider_id = ? AND o.order_status = 'out_for_delivery' LIMIT 1`, [rider.id]
+    );
+    const activeOrder = active && active.length > 0 ? active[0] : null;
+
+    if (activeOrder) {
+      const [history] = await db.query(
+        'SELECT latitude, longitude FROM route_history WHERE order_id = ? ORDER BY created_at ASC',
+        [activeOrder.id]
+      );
+      activeOrder.route_history = history || [];
+    }
+
     if (db.isMock()) {
       const dLogs = mockDB.orders.filter(o => o.rider_id === rider.id && o.order_status === 'delivered');
       const enriched = dLogs.map(o => {
         const r = mockDB.restaurants.find(rest => rest.id === o.restaurant_id);
         return { ...o, restaurant_name: r ? r.name : 'Glasshouse Bistro' };
       });
-      return res.status(200).json({ rider, deliveries: enriched });
+
+      const mockActive = mockDB.orders.find(o => o.rider_id === rider.id && o.order_status === 'out_for_delivery');
+      let activeOrderEnriched = null;
+      if (mockActive) {
+        const r = mockDB.restaurants.find(rest => rest.id === mockActive.restaurant_id);
+        activeOrderEnriched = {
+          ...mockActive,
+          restaurant_name: r ? r.name : 'Pizzeria Napoli',
+          restaurant_address: r ? r.address : '45 Corso Roma',
+          restaurant_latitude: r ? r.latitude : 12.9730,
+          restaurant_longitude: r ? r.longitude : 77.5960
+        };
+
+        const history = mockDB.route_history ? mockDB.route_history.filter(h => h.order_id === activeOrderEnriched.id) : [];
+        activeOrderEnriched.route_history = history.map(h => ({ latitude: h.latitude, longitude: h.longitude })) || [];
+      }
+
+      return res.status(200).json({ rider, deliveries: enriched, activeOrder: activeOrderEnriched });
     }
 
     res.status(200).json({
       rider,
-      deliveries: deliveries || []
+      deliveries: deliveries || [],
+      activeOrder
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

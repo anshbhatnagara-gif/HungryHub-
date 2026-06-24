@@ -1,3 +1,5 @@
+import db from '../config/db.js';
+
 export const initOrderSocket = (io) => {
   io.on('connection', (socket) => {
     console.log(`🔌 Client connected to Socket.IO: ${socket.id}`);
@@ -26,6 +28,17 @@ export const initOrderSocket = (io) => {
         heading: heading || 0,
         eta: eta || '15 mins'
       });
+
+      // Persist in DB so reloading the page doesn't lose rider position
+      // Find the order to get the rider_id
+      db.query('SELECT rider_id FROM orders WHERE id = ?', [orderId]).then(([orders]) => {
+        if (orders && orders.length > 0 && orders[0].rider_id) {
+          const riderId = orders[0].rider_id;
+          db.query('UPDATE riders SET latitude = ?, longitude = ? WHERE id = ?', [latitude, longitude, riderId]);
+          // Insert into route history
+          db.query('INSERT INTO route_history (order_id, rider_id, latitude, longitude) VALUES (?, ?, ?, ?)', [orderId, riderId, latitude, longitude]);
+        }
+      }).catch(err => console.error('DB Location Persist Error:', err));
 
       // Broadcast coordinates to admin monitors
       io.to('role_admin').emit('admin_location_update', {

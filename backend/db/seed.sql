@@ -52,11 +52,11 @@ INSERT INTO categories (id, name, image_url) VALUES
 (6, 'Beverages', 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=500&auto=format&fit=crop&q=60');
 
 -- Seed Restaurants
-INSERT INTO restaurants (id, owner_id, name, description, cuisine_type, image_url, address, rating, commission_rate, is_featured) VALUES
-(1, 2, 'The Glasshouse Bistro', 'Premium continental delicacies & craft mocktails with a glass-roof garden experience.', 'Continental, Beverages', 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=60', '12 Luxury Boulevard, Sector 4', 4.8, 12.50, TRUE),
-(2, 2, 'Pizzeria Napoli', 'Authentic woodfired Neapolitan pizzas with fresh mozzarella and local organic basil.', 'Italian, Pizza', 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=60', '45 Corso Roma, Downtown', 4.6, 10.00, TRUE),
-(3, 2, 'Kyoto Zen Garden', 'Master-grade sashimi, hand-rolled sushi & warm therapeutic ramen bowls.', 'Japanese, Sushi', 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60', '88 Sakura Lane, Chinatown', 4.9, 15.00, TRUE),
-(4, 2, 'The Green Leaf Co.', 'Power salads, gluten-free bowls, cold-pressed juices & vegan desserts.', 'Healthy, Salads', 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=60', '32 Wellness Drive, Parkside', 4.4, 8.00, FALSE);
+INSERT INTO restaurants (id, owner_id, name, description, cuisine_type, image_url, address, rating, commission_rate, is_featured, latitude, longitude, delivery_zone) VALUES
+(1, 2, 'The Glasshouse Bistro', 'Premium continental delicacies & craft mocktails with a glass-roof garden experience.', 'Continental, Beverages', 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=60', '12 Luxury Boulevard, Sector 4', 4.8, 12.50, TRUE, 12.9780, 77.5920, '[[12.97,77.58],[12.99,77.58],[12.99,77.60],[12.97,77.60]]'),
+(2, 2, 'Pizzeria Napoli', 'Authentic woodfired Neapolitan pizzas with fresh mozzarella and local organic basil.', 'Italian, Pizza', 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=60', '45 Corso Roma, Downtown', 4.6, 10.00, TRUE, 12.9730, 77.5960, '[[12.965,77.585],[12.985,77.585],[12.985,77.605],[12.965,77.605]]'),
+(3, 2, 'Kyoto Zen Garden', 'Master-grade sashimi, hand-rolled sushi & warm therapeutic ramen bowls.', 'Japanese, Sushi', 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60', '88 Sakura Lane, Chinatown', 4.9, 15.00, TRUE, 12.9805, 77.6010, '[[12.97,77.59],[12.99,77.59],[12.99,77.61],[12.97,77.61]]'),
+(4, 2, 'The Green Leaf Co.', 'Power salads, gluten-free bowls, cold-pressed juices & vegan desserts.', 'Healthy, Salads', 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=60', '32 Wellness Drive, Parkside', 4.4, 8.00, FALSE, 12.9755, 77.5855, '[[12.96,77.57],[12.99,77.57],[12.99,77.60],[12.96,77.60]]');
 
 -- Seed Menu Items
 INSERT INTO menu_items (restaurant_id, category_id, name, description, price, image_url, is_veg, is_available) VALUES
@@ -84,6 +84,10 @@ INSERT INTO coupons (code, discount_percent, max_discount, min_order_value, expi
 ('HUNGRY50', 50, 20.00, 30.00, '2027-12-31', TRUE),
 ('FREESHIP', 100, 10.00, 15.00, '2027-12-31', TRUE),
 ('WELCOME10', 10, 10.00, 10.00, '2027-12-31', TRUE);
+
+-- Seed Orders (Dummy order for review)
+INSERT INTO orders (id, user_id, restaurant_id, subtotal, delivery_fee, tax, discount_amount, payable_amount, payment_method, payment_status, order_status, delivery_address, latitude, longitude) VALUES
+(1, 4, 1, 18.00, 5.00, 2.00, 0.00, 25.00, 'razorpay', 'completed', 'delivered', '742 Evergreen Terrace, Springfield', 12.972442, 77.590643);
 
 -- Seed Reviews
 INSERT INTO reviews (user_id, restaurant_id, order_id, rating, comment) VALUES

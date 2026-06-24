@@ -36,10 +36,10 @@ const mockDB = {
     { id: 6, name: 'Beverages', image_url: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=500&auto=format&fit=crop&q=60' }
   ],
   restaurants: [
-    { id: 1, owner_id: 2, name: 'The Glasshouse Bistro', description: 'Premium continental delicacies & craft mocktails with a glass-roof garden experience.', cuisine_type: 'Continental, Beverages', image_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=60', address: '12 Luxury Boulevard, Sector 4', rating: 4.8, commission_rate: 12.50, is_featured: 1, is_active: 1 },
-    { id: 2, owner_id: 2, name: 'Pizzeria Napoli', description: 'Authentic woodfired Neapolitan pizzas with fresh mozzarella and local organic basil.', cuisine_type: 'Italian, Pizza', image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=60', address: '45 Corso Roma, Downtown', rating: 4.6, commission_rate: 10.00, is_featured: 1, is_active: 1 },
-    { id: 3, owner_id: 2, name: 'Kyoto Zen Garden', description: 'Master-grade sashimi, hand-rolled sushi & warm therapeutic ramen bowls.', cuisine_type: 'Japanese, Sushi', image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60', address: '88 Sakura Lane, Chinatown', rating: 4.9, commission_rate: 15.00, is_featured: 1, is_active: 1 },
-    { id: 4, owner_id: 2, name: 'The Green Leaf Co.', description: 'Power salads, gluten-free bowls, cold-pressed juices & vegan desserts.', cuisine_type: 'Healthy, Salads', image_url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=60', address: '32 Wellness Drive, Parkside', rating: 4.4, commission_rate: 8.00, is_featured: 0, is_active: 1 }
+    { id: 1, owner_id: 2, name: 'The Glasshouse Bistro', description: 'Premium continental delicacies & craft mocktails with a glass-roof garden experience.', cuisine_type: 'Continental, Beverages', image_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=60', address: '12 Luxury Boulevard, Sector 4', rating: 4.8, commission_rate: 12.50, is_featured: 1, is_active: 1, latitude: 12.9780, longitude: 77.5920, delivery_zone: '[[12.97,77.58],[12.99,77.58],[12.99,77.60],[12.97,77.60]]' },
+    { id: 2, owner_id: 2, name: 'Pizzeria Napoli', description: 'Authentic woodfired Neapolitan pizzas with fresh mozzarella and local organic basil.', cuisine_type: 'Italian, Pizza', image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=60', address: '45 Corso Roma, Downtown', rating: 4.6, commission_rate: 10.00, is_featured: 1, is_active: 1, latitude: 12.9730, longitude: 77.5960, delivery_zone: '[[12.965,77.585],[12.985,77.585],[12.985,77.605],[12.965,77.605]]' },
+    { id: 3, owner_id: 2, name: 'Kyoto Zen Garden', description: 'Master-grade sashimi, hand-rolled sushi & warm therapeutic ramen bowls.', cuisine_type: 'Japanese, Sushi', image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60', address: '88 Sakura Lane, Chinatown', rating: 4.9, commission_rate: 15.00, is_featured: 1, is_active: 1, latitude: 12.9805, longitude: 77.6010, delivery_zone: '[[12.97,77.59],[12.99,77.59],[12.99,77.61],[12.97,77.61]]' },
+    { id: 4, owner_id: 2, name: 'The Green Leaf Co.', description: 'Power salads, gluten-free bowls, cold-pressed juices & vegan desserts.', cuisine_type: 'Healthy, Salads', image_url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=60', address: '32 Wellness Drive, Parkside', rating: 4.4, commission_rate: 8.00, is_featured: 0, is_active: 1, latitude: 12.9755, longitude: 77.5855, delivery_zone: '[[12.96,77.57],[12.99,77.57],[12.99,77.60],[12.96,77.60]]' }
   ],
   menu_items: [
     { id: 1, restaurant_id: 1, category_id: 1, name: 'Truffle Umami Burger', description: 'Premium plant patty, Swiss cheese, white truffle aioli, toasted brioche bun.', price: 18.00, image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60', is_veg: 1, is_available: 1 },
@@ -68,7 +68,8 @@ const mockDB = {
   notifications: [
     { id: 1, user_id: 4, title: 'Welcome to HungryHub!', message: 'Delivering happiness, one bite at a time. Start exploring premium restaurants now!', is_read: 0, created_at: new Date().toISOString() }
   ],
-  wishlist: []
+  wishlist: [],
+  route_history: []
 };
 
 // Initialize connection
@@ -228,23 +229,24 @@ const evaluateMockQuery = async (sql, params = []) => {
   if (queryClean.match(/INSERT INTO orders/i)) {
     const user_id = params[0];
     const restaurant_id = params[1];
-    const rider_id = params[2] || null;
-    const subtotal = params[3];
-    const delivery_fee = params[4];
-    const tax = params[5];
-    const discount_amount = params[6];
-    const payable_amount = params[7];
-    const payment_method = params[8];
-    const payment_status = params[9];
-    const order_status = params[10] || 'placed';
-    const delivery_address = params[11];
-    const coupon_code = params[12] || null;
-    const payment_id = params[13] || null;
+    const subtotal = params[2];
+    const delivery_fee = params[3];
+    const tax = params[4];
+    const discount_amount = params[5];
+    const payable_amount = params[6];
+    const payment_method = params[7];
+    const payment_status = params[8];
+    const order_status = params[9] || 'placed';
+    const delivery_address = params[10];
+    const latitude = params[11];
+    const longitude = params[12];
+    const coupon_code = params[13] || null;
+    const payment_id = params[14] || null;
 
     const newOrdId = mockDB.orders.length + 1;
     const newOrder = {
-      id: newOrdId, user_id, restaurant_id, rider_id, subtotal, delivery_fee, tax, discount_amount, payable_amount,
-      payment_method, payment_status, order_status, delivery_address, coupon_code, payment_id,
+      id: newOrdId, user_id, restaurant_id, rider_id: null, subtotal, delivery_fee, tax, discount_amount, payable_amount,
+      payment_method, payment_status, order_status, delivery_address, latitude, longitude, coupon_code, payment_id,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     };
     mockDB.orders.push(newOrder);
@@ -412,6 +414,33 @@ const evaluateMockQuery = async (sql, params = []) => {
     const itemId = params[0];
     mockDB.menu_items = mockDB.menu_items.filter(item => item.id !== Number(itemId));
     return [{ affectedRows: 1 }];
+  }
+
+  // 29. INSERT INTO route_history
+  if (queryClean.match(/INSERT INTO route_history/i)) {
+    const order_id = params[0];
+    const rider_id = params[1];
+    const latitude = params[2];
+    const longitude = params[3];
+    if (!mockDB.route_history) mockDB.route_history = [];
+    const newId = mockDB.route_history.length + 1;
+    mockDB.route_history.push({
+      id: newId,
+      order_id: Number(order_id),
+      rider_id: Number(rider_id),
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      created_at: new Date().toISOString()
+    });
+    return [{ insertId: newId }];
+  }
+
+  // 30. SELECT * FROM route_history
+  if (queryClean.match(/SELECT.*FROM route_history WHERE order_id = \?/i)) {
+    const orderId = Number(params[0]);
+    if (!mockDB.route_history) mockDB.route_history = [];
+    const history = mockDB.route_history.filter(h => h.order_id === orderId);
+    return [history];
   }
 
   // Fallback default

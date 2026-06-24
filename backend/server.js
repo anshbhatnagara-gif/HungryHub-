@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import restaurantRoutes from './routes/restaurants.js';
 import orderRoutes from './routes/orders.js';
 import adminRoutes from './routes/admin.js';
+import mapsRoutes from './routes/maps.js';
 import { initOrderSocket } from './sockets/orderSocket.js';
 
 dotenv.config();
@@ -36,6 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/maps', mapsRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

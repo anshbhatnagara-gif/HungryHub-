@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Mail, Lock, LogIn, Chrome, ShieldAlert, Check } from 'lucide-react';
 import { setCredentials } from '../store/authSlice.js';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -48,18 +49,14 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'google_user@hungryhub.com',
-          name: 'Sarah Jenkins',
-          picture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100'
-        })
+        body: JSON.stringify({ credential: credentialResponse.credential })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -71,6 +68,10 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google Sign-In was unsuccessful. Try again later.');
   };
 
   const fillCredentials = (roleEmail) => {
@@ -139,13 +140,15 @@ export default function Login() {
           <span className="relative px-3 py-0.5 bg-stone-100 dark:bg-zinc-950 text-xs text-stone-400 dark:text-zinc-600 rounded-md font-semibold">OR</span>
         </div>
 
-        <button
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full py-3 border border-stone-200 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/30 hover:bg-white/60 dark:hover:bg-zinc-900/50 text-stone-700 dark:text-stone-300 font-semibold text-sm rounded-2xl transition-all flex items-center justify-center gap-2"
-        >
-          <Chrome size={16} className="text-red-500" /> Continue with Google
-        </button>
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            shape="rectangular"
+            theme="outline"
+            size="large"
+          />
+        </div>
 
         {/* Developer Sandbox Logins */}
         <div className="mt-8 pt-6 border-t border-stone-200 dark:border-zinc-800/80">

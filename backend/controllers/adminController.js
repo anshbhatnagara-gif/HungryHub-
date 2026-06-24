@@ -153,3 +153,154 @@ export const exportReport = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Helper: Haversine distance (in km)
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Get Admin Map Analytics & Heatmaps
+export const getAdminMapAnalytics = async (req, res) => {
+  try {
+    let activeRiders = [];
+    let heatmapOrders = [];
+    let avgDeliveryTime = 25; // default in minutes
+    let avgDeliveryDistance = 3.5; // default in km
+
+    if (db.isMock()) {
+      // 1. Active riders
+      const onlineRiders = mockDB.riders.filter(r => r.status === 'online');
+      activeRiders = onlineRiders.map(r => {
+        const u = mockDB.users.find(usr => usr.id === r.user_id);
+        const activeOrder = mockDB.orders.find(o => o.rider_id === r.id && o.order_status === 'out_for_delivery');
+        return {
+          id: r.id,
+          user_id: r.user_id,
+          vehicle_number: r.vehicle_number,
+          vehicle_type: r.vehicle_type,
+          status: r.status,
+          latitude: Number(r.latitude),
+          longitude: Number(r.longitude),
+          earnings: r.earnings,
+          rider_name: u ? u.name : 'Alex Rider',
+          rider_phone: u ? u.phone : '+1555444333',
+          active_order_id: activeOrder ? activeOrder.id : null
+        };
+      });
+
+      // 2. Heatmap coordinates
+      heatmapOrders = mockDB.orders
+        .filter(o => o.latitude && o.longitude)
+        .map(o => ({
+          id: o.id,
+          latitude: Number(o.latitude),
+          longitude: Number(o.longitude),
+          payable_amount: o.payable_amount,
+          order_status: o.order_status
+        }));
+
+      // 3. Operations metrics
+      const deliveredOrders = mockDB.orders.filter(o => o.order_status === 'delivered');
+      if (deliveredOrders.length > 0) {
+        // Calculate average time in minutes (mock: random between 15 and 35)
+        avgDeliveryTime = Math.round(
+          deliveredOrders.reduce((sum, o) => {
+            const start = new Date(o.created_at).getTime();
+            const end = new Date(o.updated_at).getTime();
+            const diffMin = Math.max(5, Math.round((end - start) / 60000));
+            return sum + (isNaN(diffMin) ? 22 : diffMin);
+          }, 0) / deliveredOrders.length
+        );
+
+        // Calculate average distance
+        let totalDist = 0;
+        let countDist = 0;
+        deliveredOrders.forEach(o => {
+          const r = mockDB.restaurants.find(rest => rest.id === o.restaurant_id);
+          if (r && o.latitude && o.longitude) {
+            totalDist += haversineDistance(
+              Number(r.latitude), Number(r.longitude),
+              Number(o.latitude), Number(o.longitude)
+            );
+            countDist++;
+          }
+        });
+        if (countDist > 0) {
+          avgDeliveryDistance = Number((totalDist / countDist).toFixed(2));
+        }
+      }
+    } else {
+      // SQL execution
+      // 1. Active riders
+      const [riders] = await db.query(
+        `SELECT r.*, u.name as rider_name, u.phone as rider_phone,
+                (SELECT id FROM orders WHERE rider_id = r.id AND order_status = 'out_for_delivery' LIMIT 1) as active_order_id
+         FROM riders r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.status = 'online'`, []
+      );
+      activeRiders = (riders || []).map(r => ({
+        ...r,
+        latitude: Number(r.latitude),
+        longitude: Number(r.longitude),
+        active_order_id: r.active_order_id
+      }));
+
+      // 2. Heatmap coordinates
+      const [orders] = await db.query(
+        `SELECT id, latitude, longitude, payable_amount, order_status FROM orders
+         WHERE latitude IS NOT NULL AND longitude IS NOT NULL`, []
+      );
+      heatmapOrders = (orders || []).map(o => ({
+        ...o,
+        latitude: Number(o.latitude),
+        longitude: Number(o.longitude)
+      }));
+
+      // 3. Operations metrics (Avg delivery time)
+      const [timeRes] = await db.query(
+        `SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_time 
+         FROM orders WHERE order_status = 'delivered'`, []
+      );
+      if (timeRes && timeRes[0] && timeRes[0].avg_time) {
+        avgDeliveryTime = Math.round(Number(timeRes[0].avg_time));
+      }
+
+      // Calculate avg distance from database records
+      const [coordsRes] = await db.query(
+        `SELECT o.latitude as o_lat, o.longitude as o_lng, r.latitude as r_lat, r.longitude as r_lng 
+         FROM orders o
+         JOIN restaurants r ON o.restaurant_id = r.id
+         WHERE o.latitude IS NOT NULL AND o.longitude IS NOT NULL AND o.order_status = 'delivered'`, []
+      );
+      if (coordsRes && coordsRes.length > 0) {
+        let totalDist = 0;
+        coordsRes.forEach(c => {
+          totalDist += haversineDistance(
+            Number(c.r_lat), Number(c.r_lng),
+            Number(c.o_lat), Number(c.o_lng)
+          );
+        });
+        avgDeliveryDistance = Number((totalDist / coordsRes.length).toFixed(2));
+      }
+    }
+
+    res.status(200).json({
+      activeRiders,
+      heatmapOrders,
+      metrics: {
+        avgDeliveryTime: avgDeliveryTime || 22,
+        avgDeliveryDistance: avgDeliveryDistance || 3.8
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

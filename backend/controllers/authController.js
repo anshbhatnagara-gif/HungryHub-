@@ -1,10 +1,13 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client();
 
 // Register User
 export const register = async (req, res) => {
-  const { name, email, password, role, phone, referred_by } = req.body;
+  const { name, email, password, role, phone, referred_by, address } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Please provide name, email, and password.' });
@@ -30,6 +33,12 @@ export const register = async (req, res) => {
       [name, email, passwordHash, role || 'customer', phone || null, referralCode, referred_by || null]
     );
     const userId = result.insertId;
+
+    if (address) {
+      await db.query('INSERT INTO addresses (user_id, title, address_line, latitude, longitude) VALUES (?, ?, ?, ?, ?)', [
+        userId, 'Default Address', address, 12.97, 77.59
+      ]);
+    }
 
     // Create wallet with $50 welcome bonus!
     const [walletResult] = await db.query('SELECT * FROM wallets WHERE user_id = ?', [userId]);
@@ -134,15 +143,23 @@ export const login = async (req, res) => {
   }
 };
 
-// Google Login Simulation
+// Google OAuth 2.0 Login
 export const googleLogin = async (req, res) => {
-  const { credential, email, name, picture } = req.body;
+  const { credential } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: 'Google login requires email.' });
+  if (!credential) {
+    return res.status(400).json({ error: 'Google login credential missing.' });
   }
 
   try {
+    // Verify the Google JWT token
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+
     let [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     let user;
 
@@ -273,14 +290,17 @@ export const getAddresses = async (req, res) => {
 };
 
 export const addAddress = async (req, res) => {
-  const { title, address_line } = req.body;
+  const { title, address_line, latitude, longitude } = req.body;
   if (!address_line) {
     return res.status(400).json({ error: 'Address line is required.' });
   }
 
   try {
+    const lat = latitude !== undefined ? parseFloat(latitude) : (12.97 + (Math.random() - 0.5) * 0.05);
+    const lng = longitude !== undefined ? parseFloat(longitude) : (77.59 + (Math.random() - 0.5) * 0.05);
+
     await db.query('INSERT INTO addresses (user_id, title, address_line, latitude, longitude) VALUES (?, ?, ?, ?, ?)', [
-      req.user.id, title || 'Home', address_line, 12.97 + (Math.random() - 0.5) * 0.05, 77.59 + (Math.random() - 0.5) * 0.05
+      req.user.id, title || 'Home', address_line, lat, lng
     ]);
     res.status(201).json({ message: 'Address saved successfully!' });
   } catch (err) {

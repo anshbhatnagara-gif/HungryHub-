@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { User, Mail, Lock, Phone, Gift, ShieldAlert, UserCheck } from 'lucide-react';
+import { User, Mail, Lock, Phone, Gift, ShieldAlert, UserCheck, MapPin } from 'lucide-react';
+import { Autocomplete, useJsApiLoader } from '@react-google-maps/api';
 import { setCredentials } from '../store/authSlice.js';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -13,8 +15,23 @@ export default function Signup() {
   const [phone, setPhone] = useState('');
   const [referredBy, setReferredBy] = useState('');
   const [role, setRole] = useState('customer'); // Default customer, can also register as owner/rider
+  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [autocomplete, setAutocomplete] = useState(null);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['places']
+  });
+
+  const onLoad = (autoC) => setAutocomplete(autoC);
+  const onPlaceChanged = () => {
+    if (autocomplete !== null) {
+      setAddress(autocomplete.getPlace().formatted_address || '');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +57,8 @@ export default function Signup() {
           password,
           role,
           phone: phone || null,
-          referred_by: referredBy || null
+          referred_by: referredBy || null,
+          address: address || null
         })
       });
 
@@ -138,6 +156,32 @@ export default function Signup() {
           </div>
 
           <div>
+            <label className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Full Address (for delivery/restaurant)</label>
+            <div className="relative">
+              {isLoaded ? (
+                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Search your location..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
+                  />
+                </Autocomplete>
+              ) : (
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter full address manually..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
+                />
+              )}
+              <MapPin className="absolute left-3.5 top-3.5 text-stone-400 dark:text-zinc-600 z-10 pointer-events-none" size={16} />
+            </div>
+          </div>
+
+          <div>
             <label className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Password</label>
             <div className="relative">
               <input
@@ -174,6 +218,41 @@ export default function Signup() {
             <UserCheck size={16} /> {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
+
+        <div className="relative my-6 text-center">
+          <span className="absolute inset-x-0 top-3 border-b border-stone-200 dark:border-zinc-800/80"></span>
+          <span className="relative px-3 py-0.5 bg-stone-100 dark:bg-zinc-950 text-xs text-stone-400 dark:text-zinc-600 rounded-md font-semibold">OR</span>
+        </div>
+
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={async (credentialResponse) => {
+              setLoading(true);
+              setError(null);
+              try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/google-login`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ credential: credentialResponse.credential })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+          
+                dispatch(setCredentials({ user: data.user, token: data.token }));
+                navigate('/restaurants');
+              } catch (err) {
+                setError(err.message);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            onError={() => setError('Google Sign-In was unsuccessful. Try again later.')}
+            shape="rectangular"
+            theme="outline"
+            size="large"
+            text="signup_with"
+          />
+        </div>
 
         <p className="text-center text-xs text-stone-500 dark:text-stone-400 mt-6">
           Already have an account?{' '}

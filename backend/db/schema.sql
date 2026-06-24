@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS restaurants (
   commission_rate DECIMAL(4, 2) DEFAULT 10.00,
   is_featured BOOLEAN DEFAULT FALSE,
   is_active BOOLEAN DEFAULT TRUE,
+  latitude DECIMAL(10, 8) DEFAULT 12.971598,
+  longitude DECIMAL(11, 8) DEFAULT 77.594562,
+  delivery_zone TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_owner (owner_id),
@@ -117,6 +120,8 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status ENUM('pending', 'completed', 'failed', 'refunded') DEFAULT 'pending',
   order_status ENUM('placed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'placed',
   delivery_address VARCHAR(500) NOT NULL,
+  latitude DECIMAL(10, 8) DEFAULT NULL,
+  longitude DECIMAL(11, 8) DEFAULT NULL,
   coupon_code VARCHAR(50) DEFAULT NULL,
   payment_id VARCHAR(100) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -202,4 +207,17 @@ CREATE TABLE IF NOT EXISTS wishlist (
   PRIMARY KEY (user_id, restaurant_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+);
+
+-- Route History Table
+CREATE TABLE IF NOT EXISTS route_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  rider_id INT NOT NULL,
+  latitude DECIMAL(10, 8) NOT NULL,
+  longitude DECIMAL(11, 8) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (rider_id) REFERENCES riders(id) ON DELETE CASCADE,
+  INDEX idx_route_order (order_id)
 );

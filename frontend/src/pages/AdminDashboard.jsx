@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Shield, Users, Compass, DollarSign, Plus, ToggleLeft, ToggleRight, FileSpreadsheet, ShieldAlert, BadgeInfo } from 'lucide-react';
+import { Shield, Users, Compass, DollarSign, Plus, ToggleLeft, ToggleRight, FileSpreadsheet, ShieldAlert, BadgeInfo, Clock, Map, Bike } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApi } from '../hooks/useApi.js';
 import { DashboardSkeleton } from '../components/SkeletonLoader.jsx';
+import MapComponent from '../components/MapComponent.jsx';
+import { io } from 'socket.io-client';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { request, loading } = useApi();
   const { user } = useSelector((state) => state.auth);
 
-  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'users', 'coupons'
+  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'maps', 'users', 'coupons'
   const [metrics, setMetrics] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [couponsList, setCouponsList] = useState([]);
+  const [restaurantsList, setRestaurantsList] = useState([]);
+  const [mapAnalytics, setMapAnalytics] = useState(null);
 
   // Coupon Form
   const [newCode, setNewCode] = useState('');
@@ -37,6 +41,18 @@ export default function AdminDashboard() {
 
       const couponsResponse = await request('/api/admin/coupons');
       setCouponsList(couponsResponse || []);
+
+      const restResp = await request('/api/maps/restaurants');
+      setRestaurantsList(restResp.restaurants || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchMapAnalytics = async () => {
+    try {
+      const data = await request('/api/admin/map-analytics');
+      setMapAnalytics(data);
     } catch (err) {
       console.error(err);
     }
@@ -48,7 +64,44 @@ export default function AdminDashboard() {
       return;
     }
     fetchAdminData();
-  }, [user, navigate, request]);
+  }, [user, navigate]);
+
+  // Real-time map updates via Socket.IO
+  useEffect(() => {
+    let socket = null;
+    if (activeTab === 'maps') {
+      fetchMapAnalytics();
+
+      socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+        transports: ['websocket', 'polling']
+      });
+
+      socket.emit('join_role', 'admin');
+
+      socket.on('admin_location_update', (data) => {
+        // data: { orderId, latitude, longitude }
+        setMapAnalytics(prev => {
+          if (!prev) return prev;
+          const updatedRiders = prev.activeRiders.map(r => {
+            if (r.active_order_id === data.orderId) {
+              return { ...r, latitude: Number(data.latitude), longitude: Number(data.longitude) };
+            }
+            return r;
+          });
+          return {
+            ...prev,
+            activeRiders: updatedRiders
+          };
+        });
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [activeTab]);
 
   const handleToggleUserActive = async (userId, currentStatus) => {
     try {
@@ -131,7 +184,7 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black shadow-lg">
             <Shield size={24} />
@@ -143,7 +196,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Navigation Tab selection */}
-        <div className="flex bg-stone-100 dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 p-1.5 rounded-2xl">
+        <div className="flex flex-wrap bg-stone-100 dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 p-1.5 rounded-2xl gap-1">
           <button
             onClick={() => setActiveTab('analytics')}
             className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -151,6 +204,14 @@ export default function AdminDashboard() {
             }`}
           >
             Analytics Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('maps')}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'maps' ? 'bg-orange-500 text-white shadow-md' : 'text-stone-600 dark:text-stone-400'
+            }`}
+          >
+            Map Operations
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -226,6 +287,130 @@ export default function AdminDashboard() {
                   <Area type="monotone" dataKey="Sales" stroke="#ea580c" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'maps' && (
+        <div className="space-y-8 animate-fadeIn">
+          {/* Metrics grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold">
+                <Clock size={18} />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-black text-stone-400">Avg Delivery Time</span>
+                <div className="text-xl font-black text-stone-850 dark:text-white mt-0.5">
+                  {mapAnalytics?.metrics?.avgDeliveryTime || 22} mins
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold">
+                <Compass size={18} />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-black text-stone-400">Avg Trip Distance</span>
+                <div className="text-xl font-black text-stone-850 dark:text-white mt-0.5">
+                  {mapAnalytics?.metrics?.avgDeliveryDistance || 3.8} km
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+                <Bike size={18} />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-black text-stone-400">Riders Online</span>
+                <div className="text-xl font-black text-stone-850 dark:text-white mt-0.5">
+                  {mapAnalytics?.activeRiders?.length || 0} active
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
+                🔥
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-black text-stone-400">Hotspots Tracked</span>
+                <div className="text-xl font-black text-stone-850 dark:text-white mt-0.5">
+                  {mapAnalytics?.heatmapOrders?.length || 0} locations
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Map */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className="lg:col-span-2 p-6 rounded-[32px] border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/10 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-extrabold text-stone-850 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Map size={16} className="text-orange-500" /> Real-time Logistics Fleet View
+                </h3>
+                <span className="text-[10px] text-stone-500 font-bold bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-lg border border-orange-500/20">
+                  Heatmap Overlay Enabled
+                </span>
+              </div>
+              <div className="w-full h-[450px] rounded-2xl overflow-hidden relative">
+                <MapComponent
+                  center={{ lat: 12.9716, lng: 77.5946 }}
+                  zoom={13}
+                  markers={[
+                    ...(restaurantsList || []).map(r => ({
+                      lat: Number(r.latitude),
+                      lng: Number(r.longitude),
+                      iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180136.png'
+                    })),
+                    ...(mapAnalytics?.activeRiders || []).map(r => ({
+                      lat: r.latitude,
+                      lng: r.longitude,
+                      iconUrl: 'https://cdn-icons-png.flaticon.com/512/3034/3034947.png'
+                    }))
+                  ]}
+                  heatmap={mapAnalytics?.heatmapOrders}
+                  height="100%"
+                  theme="dark"
+                />
+              </div>
+            </div>
+
+            {/* Online Riders Sidebar */}
+            <div className="p-6 rounded-[32px] border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-900/30 space-y-4">
+              <span className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                Active Couriers List
+              </span>
+              <div className="space-y-3 max-h-[390px] overflow-y-auto pr-1">
+                {mapAnalytics?.activeRiders && mapAnalytics.activeRiders.length > 0 ? (
+                  mapAnalytics.activeRiders.map(r => (
+                    <div key={r.id} className="p-3 border border-stone-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900/40 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-black text-stone-850 dark:text-white">{r.rider_name}</span>
+                        <span className="text-[9px] text-green-500 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20 font-bold uppercase">
+                          {r.status}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-stone-550 dark:text-stone-400 font-semibold space-y-0.5">
+                        <p>Vehicle: {r.vehicle_number} ({r.vehicle_type})</p>
+                        <p>Coords: [{Number(r.latitude).toFixed(4)}, {Number(r.longitude).toFixed(4)}]</p>
+                        {r.active_order_id && (
+                          <p className="text-purple-500 dark:text-purple-400 font-bold">
+                            Delivering Order #{r.active_order_id}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 text-xs text-stone-400 font-bold">
+                    No active riders currently online.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

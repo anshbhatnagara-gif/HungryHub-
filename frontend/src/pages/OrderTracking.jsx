@@ -3,6 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { CheckCircle2, Clock, MapPin, Phone, ShoppingBag, Sparkles, Navigation } from 'lucide-react';
 import { useApi } from '../hooks/useApi.js';
+import MapComponent from '../components/MapComponent.jsx';
 
 export default function OrderTracking() {
   const { search } = useLocation();
@@ -14,16 +15,15 @@ export default function OrderTracking() {
   const [orderStatus, setOrderStatus] = useState('placed'); // default
   
   // Rider coordinates simulation
-  const [riderCoords, setRiderCoords] = useState({ x: 40, y: 30 }); // Starts at restaurant
+  const [riderCoords, setRiderCoords] = useState(null); // Starts at restaurant
   const [eta, setEta] = useState('15 mins');
   const [socketConnected, setSocketConnected] = useState(false);
+  const [routePolyline, setRoutePolyline] = useState([]);
   const socketRef = useRef(null);
 
-  // Constants for map layout:
-  // Customer: {x: 80, y: 70}
-  // Restaurant: {x: 30, y: 30}
-  const restaurantCoords = { x: 30, y: 30 };
-  const customerCoords = { x: 80, y: 70 };
+  // Constants for map layout
+  const [restaurantCoords, setRestaurantCoords] = useState(null);
+  const [customerCoords, setCustomerCoords] = useState(null);
 
   useEffect(() => {
     if (!orderId) return;
@@ -33,6 +33,18 @@ export default function OrderTracking() {
         const data = await request(`/api/orders/${orderId}`);
         setOrderData(data);
         setOrderStatus(data.order.order_status);
+
+        // Fetch directions if coordinates exist
+        if (data.restaurant.latitude && data.order.latitude) {
+           setRestaurantCoords({ lat: data.restaurant.latitude, lng: data.restaurant.longitude });
+           setCustomerCoords({ lat: data.order.latitude, lng: data.order.longitude });
+           const dirRes = await request(`/api/maps/directions?originLat=${data.restaurant.latitude}&originLng=${data.restaurant.longitude}&destLat=${data.order.latitude}&destLng=${data.order.longitude}`);
+           if (dirRes && dirRes.route) setRoutePolyline(dirRes.route);
+        } else {
+           // Fallback to random if no DB coords
+           setRestaurantCoords({ lat: 12.9716, lng: 77.5946 });
+           setCustomerCoords({ lat: 12.9800, lng: 77.6000 });
+        }
       } catch (err) {
         console.error(err);
       }
@@ -72,18 +84,8 @@ export default function OrderTracking() {
       const lng = data.longitude;
       setEta(data.eta || '10 mins');
       
-      // Plot lat/long on our map grid (translate coordinates into map percentages)
-      // Standard latitude: 12.97..., Longitude: 77.59...
-      // Map range: x (20% to 90%), y (20% to 90%)
-      // If we receive coordinates, let's map them or fall back to linear updates
       if (lat && lng) {
-        // Map projection formulas:
-        const xPercent = 30 + (lng - 77.594562) * 5000;
-        const yPercent = 30 + (lat - 12.971598) * 5000;
-        setRiderCoords({ 
-          x: Math.min(90, Math.max(10, xPercent)), 
-          y: Math.min(90, Math.max(10, yPercent)) 
-        });
+        setRiderCoords({ lat, lng });
       }
     });
 
@@ -98,6 +100,8 @@ export default function OrderTracking() {
 
   // Backup Client-Side driving simulation loop if status is out_for_delivery
   useEffect(() => {
+    if (!restaurantCoords || !customerCoords) return;
+
     if (orderStatus !== 'out_for_delivery') {
       if (orderStatus === 'placed' || orderStatus === 'preparing' || orderStatus === 'ready') {
         setRiderCoords(restaurantCoords);
@@ -116,17 +120,17 @@ export default function OrderTracking() {
       }
       
       // Linearly interpolate between restaurant and customer
-      const currentX = restaurantCoords.x + (customerCoords.x - restaurantCoords.x) * progress;
-      const currentY = restaurantCoords.y + (customerCoords.y - restaurantCoords.y) * progress;
-      setRiderCoords({ x: currentX, y: currentY });
+      const currentLat = restaurantCoords.lat + (customerCoords.lat - restaurantCoords.lat) * progress;
+      const currentLng = restaurantCoords.lng + (customerCoords.lng - restaurantCoords.lng) * progress;
+      setRiderCoords({ lat: currentLat, lng: currentLng });
 
       // Update ETA
       const remainingTime = Math.ceil((1 - progress) * 15);
       setEta(remainingTime > 0 ? `${remainingTime} mins` : 'Arrived!');
-    }, 1000);
+    }, 2000);
 
     return () => clearInterval(simInterval);
-  }, [orderStatus]);
+  }, [orderStatus, restaurantCoords, customerCoords]);
 
   if (loading && !orderData) {
     return (
@@ -207,60 +211,26 @@ export default function OrderTracking() {
             })}
           </div>
 
-          {/* Interactive Simulated Map */}
+          {/* Real Map Component */}
           <div className="rounded-[36px] overflow-hidden border border-stone-200 dark:border-zinc-800 bg-stone-100 dark:bg-zinc-900/40 relative shadow-inner">
-            <div className="w-full h-80 relative map-grid">
-              {/* Restaurant Icon */}
-              <div 
-                style={{ left: `${restaurantCoords.x}%`, top: `${restaurantCoords.y}%` }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-10"
-              >
-                <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-950 scale-90 hover:scale-100 transition-transform">
-                  🏪
-                </div>
-                <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-[8px] text-white font-bold whitespace-nowrap">{restaurant.name}</span>
-              </div>
-
-              {/* Customer Address Icon */}
-              <div 
-                style={{ left: `${customerCoords.x}%`, top: `${customerCoords.y}%` }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-10"
-              >
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-950 scale-90 hover:scale-100 transition-transform">
-                  🏠
-                </div>
-                <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-[8px] text-white font-bold whitespace-nowrap">Home Delivery</span>
-              </div>
-
-              {/* Driving Rider Icon */}
-              {(orderStatus === 'out_for_delivery' || orderStatus === 'delivered' || rider) && (
-                <div 
-                  style={{ left: `${riderCoords.x}%`, top: `${riderCoords.y}%` }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-20 transition-all duration-1000 ease-out"
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-xl border-2 border-white dark:border-zinc-950 animate-bounce">
-                    <Navigation size={18} className="rotate-45" />
-                  </div>
-                  <span className="px-1.5 py-0.5 rounded bg-purple-600 text-[8px] text-white font-bold whitespace-nowrap">Rider (Alex)</span>
-                </div>
-              )}
-
-              {/* Connecting line */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                <line
-                  x1={`${restaurantCoords.x}%`}
-                  y1={`${restaurantCoords.y}%`}
-                  x2={`${customerCoords.x}%`}
-                  y2={`${customerCoords.y}%`}
-                  stroke="rgba(234, 88, 12, 0.15)"
-                  strokeWidth="2"
-                  strokeDasharray="6,6"
-                />
-              </svg>
-            </div>
+            {restaurantCoords ? (
+              <MapComponent
+                center={riderCoords || restaurantCoords}
+                zoom={14}
+                route={routePolyline}
+                markers={[
+                  { lat: restaurantCoords.lat, lng: restaurantCoords.lng, iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180136.png' },
+                  { lat: customerCoords.lat, lng: customerCoords.lng, iconUrl: 'https://cdn-icons-png.flaticon.com/512/2952/2952321.png' },
+                  ...(riderCoords ? [{ lat: riderCoords.lat, lng: riderCoords.lng, iconUrl: 'https://cdn-icons-png.flaticon.com/512/3034/3034947.png' }] : [])
+                ]}
+                height="320px"
+              />
+            ) : (
+              <div className="w-full h-80 flex items-center justify-center text-stone-400">Loading Map...</div>
+            )}
             
             {/* Map metadata banner */}
-            <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl border border-white/10 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex justify-between items-center">
+            <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl border border-white/10 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex justify-between items-center z-50">
               <span className="text-[10px] text-stone-500 dark:text-zinc-500 font-bold uppercase tracking-wider block">Live Delivery Map</span>
               <span className="text-xs font-black text-purple-500">Rider driving velocity: Normal</span>
             </div>

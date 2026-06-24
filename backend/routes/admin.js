@@ -7,7 +7,8 @@ import {
   getCoupons,
   createCoupon,
   toggleCouponStatus,
-  exportReport
+  exportReport,
+  getAdminMapAnalytics
 } from '../controllers/adminController.js';
 import { verifyToken, checkRole } from '../middleware/auth.js';
 
@@ -19,6 +20,7 @@ router.use(checkRole(['admin']));
 
 router.get('/metrics', getAdminMetrics);
 router.get('/charts', getRevenueChartData);
+router.get('/map-analytics', getAdminMapAnalytics);
 router.get('/users', getAllUsers);
 router.post('/users/toggle', toggleUserStatus);
 router.get('/coupons', getCoupons);

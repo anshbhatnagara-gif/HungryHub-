@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { ChefHat, ClipboardList, TrendingUp, Plus, Trash2, CheckCircle2, PackageCheck, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApi } from '../hooks/useApi.js';
+import MapComponent from '../components/MapComponent.jsx';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -232,6 +233,18 @@ export default function OwnerDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Map Display */}
+      {restaurant.latitude && restaurant.longitude && (
+        <div className="p-4 rounded-[32px] border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/10">
+          <span className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-4 ml-2">Restaurant Location</span>
+          <MapComponent 
+            center={{ lat: restaurant.latitude, lng: restaurant.longitude }} 
+            markers={[{ lat: restaurant.latitude, lng: restaurant.longitude, iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180136.png' }]}
+            height="250px"
+          />
+        </div>
+      )}
 
       {/* Tabs panels */}
       {activeTab === 'orders' && (
