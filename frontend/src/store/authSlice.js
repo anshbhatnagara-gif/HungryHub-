@@ -12,7 +12,7 @@ try {
 const initialState = {
   user,
   token,
-  isAuthenticated: !!token,
+  isAuthenticated: !!token && !!user,
   loading: false,
   error: null
 };

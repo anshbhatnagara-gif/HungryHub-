@@ -7,6 +7,8 @@ export const validateCoupon = async (req, res) => {
     return res.status(400).json({ error: 'Please enter a coupon code.' });
   }
 
+  const parsedAmount = parseFloat(amount) || 0;
+
   try {
     const [coupons] = await db.query('SELECT * FROM coupons WHERE code = ? AND is_active = 1', [code]);
     if (!coupons || coupons.length === 0) {
@@ -14,24 +16,28 @@ export const validateCoupon = async (req, res) => {
     }
 
     const coupon = coupons[0];
-    if (Number(amount) < Number(coupon.min_order_value)) {
+    const discountPercent = parseFloat(coupon.discount_percent) || 0;
+    const maxDiscount = parseFloat(coupon.max_discount) || 0;
+    const minOrderValue = parseFloat(coupon.min_order_value) || 0;
+
+    if (parsedAmount < minOrderValue) {
       return res.status(400).json({
         isValid: false,
-        error: `Minimum order value of $${coupon.min_order_value} required for this coupon.`
+        error: `Minimum order value of $${minOrderValue.toFixed(2)} required for this coupon.`
       });
     }
 
     // Calculate discount
-    let discount = Number((Number(amount) * (coupon.discount_percent / 100)).toFixed(2));
-    if (discount > Number(coupon.max_discount)) {
-      discount = Number(coupon.max_discount);
+    let discount = Number((parsedAmount * (discountPercent / 100)).toFixed(2));
+    if (discount > maxDiscount) {
+      discount = maxDiscount;
     }
 
     res.status(200).json({
       isValid: true,
-      discount,
+      discount: Number(discount.toFixed(2)),
       code: coupon.code,
-      message: `Coupon applied! You saved $${discount}.`
+      message: `Coupon applied! You saved $${discount.toFixed(2)}.`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

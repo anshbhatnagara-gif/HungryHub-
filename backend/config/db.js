@@ -6,6 +6,31 @@ dotenv.config();
 let pool = null;
 let isFallback = false;
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getConnectionLabel = () => {
+  if (process.env.DATABASE_URL && (process.env.USE_DATABASE_URL === 'true' || !process.env.DB_HOST)) return 'DATABASE_URL';
+  return `${process.env.DB_USER || 'root'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}/${process.env.DB_NAME || process.env.DB_DATABASE || 'hungryhub'}`;
+};
+
+const verifyPoolConnection = async (retries = 12, delayMs = 5000) => {
+  let lastError;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const conn = await pool.getConnection();
+      conn.release();
+      return;
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        console.warn(`MySQL connection attempt ${attempt}/${retries} failed for ${getConnectionLabel()}: ${err.code || err.message}`);
+        await wait(delayMs);
+      }
+    }
+  }
+  throw lastError;
+};
+
 // Mock Data Store for In-Memory Fallback
 const mockDB = {
   users: [
@@ -74,29 +99,38 @@ const mockDB = {
 
 // Initialize connection
 try {
-  const dbUri = process.env.DATABASE_URL;
+  const dbUri = process.env.DATABASE_URL && (process.env.USE_DATABASE_URL === 'true' || !process.env.DB_HOST)
+    ? process.env.DATABASE_URL
+    : null;
   if (dbUri) {
-    pool = mysql.createPool(dbUri);
+    pool = mysql.createPool({
+      uri: dbUri,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
   } else {
     pool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || 3306,
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'hungryhub',
+      database: process.env.DB_NAME || process.env.DB_DATABASE || 'hungryhub',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0
     });
   }
 
-  // Verify connection
-  const conn = await pool.getConnection();
-  console.log('✅ MySQL database connected successfully.');
-  conn.release();
+  await verifyPoolConnection();
+  console.log('✅ MySQL database connected successfully');
 } catch (err) {
+  if (process.env.ALLOW_DB_FALLBACK !== 'true') {
+    console.error('MySQL database connection failed and fallback is disabled.');
+    throw err;
+  }
   isFallback = true;
-  console.warn('⚠️  MySQL database connection failed. Falling back to IN-MEMORY DATABASE.');
+  console.warn('MySQL database connection failed. Falling back to IN-MEMORY DATABASE.');
 }
 
 // In-Memory Database Query Evaluator
@@ -149,8 +183,8 @@ const evaluateMockQuery = async (sql, params = []) => {
     return [user ? [user] : []];
   }
 
-  // 4. SELECT * FROM wallets WHERE user_id = ?
-  if (queryClean.match(/SELECT \* FROM wallets WHERE user_id = \?/i)) {
+  // 4. SELECT (id, balance, *) FROM wallets WHERE user_id = ?
+  if (queryClean.match(/SELECT.*FROM wallets WHERE user_id = \?/i)) {
     const wallet = mockDB.wallets.find(w => w.user_id === Number(params[0]));
     return [wallet ? [wallet] : []];
   }
@@ -193,8 +227,28 @@ const evaluateMockQuery = async (sql, params = []) => {
 
   // 8. SELECT * FROM transactions WHERE wallet_id = ?
   if (queryClean.match(/SELECT \* FROM transactions WHERE wallet_id = \?/i)) {
-    const txs = mockDB.transactions.filter(t => t.wallet_id === Number(params[0]));
-    return [txs];
+    const walletId = Number(params[0]);
+    const txs = mockDB.transactions.filter(t => Number(t.wallet_id) === walletId);
+    return [txs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at))];
+  }
+
+  // 8b. INSERT INTO wallets
+  if (queryClean.match(/INSERT INTO wallets/i)) {
+    const user_id = Number(params[0]);
+    const balance = Number(params[1]) || 50.00;
+    // Prevent duplicates
+    const existing = mockDB.wallets.find(w => w.user_id === user_id);
+    if (existing) {
+      return [{ insertId: existing.id }];
+    }
+    const newWalletId = mockDB.wallets.length + 1;
+    mockDB.wallets.push({ id: newWalletId, user_id, balance });
+    return [{ insertId: newWalletId }];
+  }
+
+  if (queryClean.match(/SELECT id FROM restaurants WHERE id = \? AND owner_id = \?/i)) {
+    const rest = mockDB.restaurants.find(r => r.id === Number(params[0]) && r.owner_id === Number(params[1]));
+    return [rest ? [{ id: rest.id }] : []];
   }
 
   // 9. SELECT * FROM restaurants
@@ -208,6 +262,10 @@ const evaluateMockQuery = async (sql, params = []) => {
   }
 
   // 11. SELECT * FROM menu_items WHERE restaurant_id = ?
+  if (queryClean.match(/SELECT \* FROM menu_items WHERE is_available = 1/i)) {
+    return [mockDB.menu_items.filter(i => Number(i.is_available) === 1)];
+  }
+
   if (queryClean.match(/SELECT \* FROM menu_items WHERE restaurant_id = \?/i)) {
     const items = mockDB.menu_items.filter(i => i.restaurant_id === Number(params[0]));
     return [items];
@@ -219,9 +277,11 @@ const evaluateMockQuery = async (sql, params = []) => {
     return [revs];
   }
 
-  // 13. SELECT * FROM coupons WHERE code = ?
+  // 13. SELECT * FROM coupons WHERE code = ? (with optional AND is_active = 1)
   if (queryClean.match(/SELECT \* FROM coupons WHERE code = \?/i)) {
-    const coupon = mockDB.coupons.find(c => c.code === params[0]);
+    const code = params[0];
+    const checkActive = queryClean.toLowerCase().includes('is_active');
+    const coupon = mockDB.coupons.find(c => c.code === code && (!checkActive || c.is_active === 1));
     return [coupon ? [coupon] : []];
   }
 
@@ -406,13 +466,26 @@ const evaluateMockQuery = async (sql, params = []) => {
   }
 
   if (queryClean.match(/UPDATE menu_items SET name = \?/i) || queryClean.match(/UPDATE menu_items/i)) {
-    // Just mock success
-    return [{ affectedRows: 1 }];
+    const itemId = Number(params[7]);
+    const restId = Number(params[8]);
+    const item = mockDB.menu_items.find(i => i.id === itemId && i.restaurant_id === restId);
+    if (item) {
+      item.name = params[0];
+      item.description = params[1];
+      item.price = Number(params[2]);
+      item.image_url = params[3];
+      item.category_id = params[4] ? Number(params[4]) : null;
+      item.is_veg = params[5] ? 1 : 0;
+      item.is_available = params[6] ? 1 : 0;
+      return [{ affectedRows: 1 }];
+    }
+    return [{ affectedRows: 0 }];
   }
 
   if (queryClean.match(/DELETE FROM menu_items/i)) {
     const itemId = params[0];
-    mockDB.menu_items = mockDB.menu_items.filter(item => item.id !== Number(itemId));
+    const restId = params[1] ? Number(params[1]) : null;
+    mockDB.menu_items = mockDB.menu_items.filter(item => item.id !== Number(itemId) || (restId && item.restaurant_id !== restId));
     return [{ affectedRows: 1 }];
   }
 
@@ -455,11 +528,16 @@ const db = {
     try {
       return await pool.query(sql, params);
     } catch (err) {
-      console.error('❌ SQL Query Error: ', err.message);
-      // Fallback in-case MySQL goes offline mid-operation
-      isFallback = true;
-      console.warn('⚠️  MySQL connection disrupted. Switching to IN-MEMORY fallback database.');
-      return await evaluateMockQuery(sql, params);
+      const connErrors = ['ECONNREFUSED', 'PROTOCOL_CONNECTION_LOST', 'ETIMEDOUT', 'ENOTFOUND', 'EPIPE', 'ER_ACCESS_DENIED_ERROR', 'ENETUNREACH', 'EHOSTUNREACH'];
+      if (connErrors.includes(err.code) || err.message.includes('connect')) {
+        if (process.env.ALLOW_DB_FALLBACK !== 'true') {
+          throw err;
+        }
+        isFallback = true;
+        console.warn('MySQL connection disrupted. Switching to IN-MEMORY fallback database.');
+        return await evaluateMockQuery(sql, params);
+      }
+      throw err;
     }
   },
   execute: async (sql, params) => {

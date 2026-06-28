@@ -12,7 +12,11 @@ export const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_hungryhub_jwt_key_2026');
+    const jwtSecret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev_hungryhub_jwt_secret');
+    if (!jwtSecret) {
+      return res.status(500).json({ error: 'Authentication is not configured.' });
+    }
+    const decoded = jwt.verify(token, jwtSecret);
     req.user = decoded;
     next();
   } catch (err) {

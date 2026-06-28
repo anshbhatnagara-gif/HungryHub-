@@ -62,7 +62,11 @@ export default function Login() {
       if (!response.ok) throw new Error(data.error);
 
       dispatch(setCredentials({ user: data.user, token: data.token }));
-      navigate('/restaurants');
+      // Navigate by role
+      if (data.user.role === 'admin') navigate('/admin');
+      else if (data.user.role === 'owner') navigate('/owner');
+      else if (data.user.role === 'rider') navigate('/rider');
+      else navigate('/restaurants');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,7 +84,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gradient-to-tr from-amber-500/5 via-stone-50 to-rose-500/5 dark:from-zinc-950 dark:to-zinc-900 transition-colors">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 transition-colors">
       <div className="w-full max-w-md p-8 rounded-3xl glass-panel-light dark:glass-panel-dark shadow-2xl relative">
         <div className="text-center mb-8">
           <span className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-md mb-3">
@@ -99,9 +103,10 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Email Address</label>
+            <label htmlFor="login-email" className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Email Address</label>
             <div className="relative">
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -113,13 +118,14 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Password</label>
+            <label htmlFor="login-password" className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Password</label>
             <div className="relative">
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Password"
                 className="w-full pl-10 pr-4 py-3 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
               />
               <Lock className="absolute left-3.5 top-3.5 text-stone-400 dark:text-zinc-600" size={16} />

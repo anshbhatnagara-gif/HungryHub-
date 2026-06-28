@@ -1,29 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 // Layout & Global components
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
-
-// Pages
 import Home from './pages/Home.jsx';
-import Restaurants from './pages/Restaurants.jsx';
-import RestaurantDetails from './pages/RestaurantDetails.jsx';
-import Cart from './pages/Cart.jsx';
-import Checkout from './pages/Checkout.jsx';
-import OrderTracking from './pages/OrderTracking.jsx';
-import Wallet from './pages/Wallet.jsx';
-import Profile from './pages/Profile.jsx';
-import Login from './pages/Login.jsx';
-import Signup from './pages/Signup.jsx';
-import Contact from './pages/Contact.jsx';
-import About from './pages/About.jsx';
 
-// Dashboards
-import OwnerDashboard from './pages/OwnerDashboard.jsx';
-import RiderDashboard from './pages/RiderDashboard.jsx';
-import AdminDashboard from './pages/AdminDashboard.jsx';
+const Restaurants = lazy(() => import('./pages/Restaurants.jsx'));
+const RestaurantDetails = lazy(() => import('./pages/RestaurantDetails.jsx'));
+const Cart = lazy(() => import('./pages/Cart.jsx'));
+const Checkout = lazy(() => import('./pages/Checkout.jsx'));
+const OrderTracking = lazy(() => import('./pages/OrderTracking.jsx'));
+const Wallet = lazy(() => import('./pages/Wallet.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const Login = lazy(() => import('./pages/Login.jsx'));
+const Signup = lazy(() => import('./pages/Signup.jsx'));
+const Contact = lazy(() => import('./pages/Contact.jsx'));
+const About = lazy(() => import('./pages/About.jsx'));
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
+const RiderDashboard = lazy(() => import('./pages/RiderDashboard.jsx'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 
 export default function App() {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -60,63 +57,71 @@ export default function App() {
 
   return (
     <Router>
-      <div className="flex flex-col min-h-screen bg-stone-50 text-stone-900 dark:bg-zinc-950 dark:text-stone-100 transition-colors duration-300">
+      <div className="horror-site-bg flex flex-col min-h-screen text-stone-900 dark:text-stone-100 transition-colors duration-300">
         <Navbar theme={theme} toggleTheme={toggleTheme} />
         
         <main className="flex-1">
-          <Routes>
-            {/* Customer Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/restaurants" element={<Restaurants />} />
-            <Route path="/restaurants/:id" element={<RestaurantDetails />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+          <Suspense
+            fallback={
+              <div className="min-h-[50vh] flex items-center justify-center text-sm text-stone-500 dark:text-stone-400">
+                Loading...
+              </div>
+            }
+          >
+            <Routes>
+              {/* Customer Routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/restaurants" element={<Restaurants />} />
+              <Route path="/restaurants/:id" element={<RestaurantDetails />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
 
-            {/* Protected Customer Pages */}
-            <Route path="/checkout" element={
-              <ProtectedRoute allowedRoles={['customer', 'admin']}>
-                <Checkout />
-              </ProtectedRoute>
-            } />
-            <Route path="/orders/tracking" element={
-              <ProtectedRoute allowedRoles={['customer', 'admin', 'rider']}>
-                <OrderTracking />
-              </ProtectedRoute>
-            } />
-            <Route path="/wallet" element={
-              <ProtectedRoute allowedRoles={['customer', 'owner', 'rider', 'admin']}>
-                <Wallet />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute allowedRoles={['customer', 'owner', 'rider', 'admin']}>
-                <Profile />
-              </ProtectedRoute>
-            } />
+              {/* Protected Customer Pages */}
+              <Route path="/checkout" element={
+                <ProtectedRoute allowedRoles={['customer', 'admin']}>
+                  <Checkout />
+                </ProtectedRoute>
+              } />
+              <Route path="/orders/tracking" element={
+                <ProtectedRoute allowedRoles={['customer', 'admin', 'rider']}>
+                  <OrderTracking />
+                </ProtectedRoute>
+              } />
+              <Route path="/wallet" element={
+                <ProtectedRoute allowedRoles={['customer', 'owner', 'rider', 'admin']}>
+                  <Wallet />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute allowedRoles={['customer', 'owner', 'rider', 'admin']}>
+                  <Profile />
+                </ProtectedRoute>
+              } />
 
-            {/* Dashboards */}
-            <Route path="/owner" element={
-              <ProtectedRoute allowedRoles={['owner', 'admin']}>
-                <OwnerDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/rider" element={
-              <ProtectedRoute allowedRoles={['rider', 'admin']}>
-                <RiderDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
+              {/* Dashboards */}
+              <Route path="/owner" element={
+                <ProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <OwnerDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/rider" element={
+                <ProtectedRoute allowedRoles={['rider', 'admin']}>
+                  <RiderDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </main>
 
         <Footer />

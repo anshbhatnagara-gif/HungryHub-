@@ -13,20 +13,28 @@ const cartSlice = createSlice({
   reducers: {
     addToCart(state, action) {
       const { item, restaurant } = action.payload;
+      const normalizedItem = {
+        ...item,
+        price: Number(item.price) || 0
+      };
+      const normalizedRestaurant = {
+        ...restaurant,
+        delivery_fee: Number(restaurant.delivery_fee) || 0
+      };
       
       // If adding from a different restaurant, clear cart first
-      if (state.restaurant && state.restaurant.id !== restaurant.id) {
+      if (state.restaurant && state.restaurant.id !== normalizedRestaurant.id) {
         state.items = [];
         state.coupon = null;
       }
       
-      state.restaurant = restaurant;
+      state.restaurant = normalizedRestaurant;
       
-      const existing = state.items.find(i => i.id === item.id);
+      const existing = state.items.find(i => i.id === normalizedItem.id);
       if (existing) {
         existing.quantity += 1;
       } else {
-        state.items.push({ ...item, quantity: 1 });
+        state.items.push({ ...normalizedItem, quantity: 1 });
       }
     },
     removeFromCart(state, action) {

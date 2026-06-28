@@ -239,11 +239,11 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80">
               <span className="text-[9px] uppercase font-black text-stone-400">Sales Turnover</span>
-              <div className="text-xl font-black text-stone-850 dark:text-white mt-1">${metrics.totalSales.toFixed(2)}</div>
+              <div className="text-xl font-black text-stone-850 dark:text-white mt-1">${Number(metrics.totalSales || 0).toFixed(2)}</div>
             </div>
             <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80">
               <span className="text-[9px] uppercase font-black text-stone-400">Platform Comm.</span>
-              <div className="text-xl font-black text-stone-850 dark:text-white mt-1">${metrics.totalCommission.toFixed(2)}</div>
+              <div className="text-xl font-black text-stone-850 dark:text-white mt-1">${Number(metrics.totalCommission || 0).toFixed(2)}</div>
             </div>
             <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/20 border border-stone-200/50 dark:border-zinc-800/80">
               <span className="text-[9px] uppercase font-black text-stone-400">Total Users</span>

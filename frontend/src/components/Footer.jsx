@@ -4,7 +4,7 @@ import { Facebook, Twitter, Instagram, Github, Mail, Phone, MapPin } from 'lucid
 
 export default function Footer() {
   return (
-    <footer className="bg-stone-100 dark:bg-zinc-950 border-t border-stone-200 dark:border-zinc-900/60 pt-16 pb-8 transition-colors duration-300">
+    <footer className="bg-black/45 backdrop-blur-md border-t border-white/10 pt-16 pb-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           {/* Brand Info */}
@@ -83,7 +83,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-stone-200 dark:border-zinc-900 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-stone-400 dark:text-zinc-600">
-          <p>© 2026 HungryHub Inc. All rights reserved.</p>
+          <p>Copyright 2026 HungryHub Inc. All rights reserved.</p>
           <div className="flex space-x-4 mt-4 sm:mt-0">
             <a href="#" className="hover:text-orange-500">Security</a>
             <a href="#" className="hover:text-orange-500">System Status</a>

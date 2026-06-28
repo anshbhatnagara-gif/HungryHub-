@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
-import { ChefHat, ClipboardList, TrendingUp, Plus, Trash2, CheckCircle2, PackageCheck, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ChefHat, ClipboardList, TrendingUp, Plus, Trash2, CheckCircle2, PackageCheck } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApi } from '../hooks/useApi.js';
 import MapComponent from '../components/MapComponent.jsx';
@@ -25,9 +25,11 @@ export default function OwnerDashboard() {
   const [newItemImg, setNewItemImg] = useState('');
   const [newItemCat, setNewItemCat] = useState('');
 
+  const canManageOwnerDashboard = user?.role === 'owner' || user?.role === 'admin';
+
   // Socket setup
   useEffect(() => {
-    if (!user || user.role !== 'owner') {
+    if (!user || !canManageOwnerDashboard) {
       navigate('/login');
       return;
     }
@@ -42,7 +44,9 @@ export default function OwnerDashboard() {
         // Fetch user restaurant details
         // Note: owner_id is user.id, backend returns list or searches
         const restaurantsList = await request('/api/restaurants');
-        const myRest = restaurantsList.find(r => r.owner_id === user.id);
+        const myRest = user.role === 'admin'
+          ? restaurantsList[0]
+          : restaurantsList.find(r => r.owner_id === user.id);
         if (myRest) {
           setRestaurant(myRest);
 
@@ -57,7 +61,7 @@ export default function OwnerDashboard() {
       }
     };
     fetchOwnerData();
-  }, [user, navigate, request]);
+  }, [user, canManageOwnerDashboard, navigate, request]);
 
   // Real-time socket connections for incoming orders
   useEffect(() => {
@@ -109,37 +113,18 @@ export default function OwnerDashboard() {
     if (!newItemName || !newItemPrice) return;
 
     try {
-      // Let's create the menu item
-      // We will perform a custom request to backend to mock menu insertions
-      if (db.isMock()) {
-        const newId = menuItems.length + 1;
-        const newItem = {
-          id: newId,
-          restaurant_id: restaurant.id,
-          category_id: Number(newItemCat),
+      await request(`/api/restaurants/${restaurant.id}/menu`, {
+        method: 'POST',
+        body: JSON.stringify({
           name: newItemName,
           description: newItemDesc,
           price: Number(newItemPrice),
-          image_url: newItemImg || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
-          is_veg: 1,
-          is_available: 1
-        };
-        mockDB.menu_items.push(newItem);
-        setMenuItems([...menuItems, newItem]);
-      } else {
-        await request(`/api/restaurants/${restaurant.id}/menu`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: newItemName,
-            description: newItemDesc,
-            price: Number(newItemPrice),
-            image_url: newItemImg,
-            category_id: Number(newItemCat)
-          })
-        });
-        const mItems = await request(`/api/restaurants/${restaurant.id}/menu`);
-        setMenuItems(mItems || []);
-      }
+          image_url: newItemImg,
+          category_id: Number(newItemCat)
+        })
+      });
+      const mItems = await request(`/api/restaurants/${restaurant.id}/menu`);
+      setMenuItems(mItems || []);
 
       // Reset Form
       setNewItemName('');
@@ -154,14 +139,9 @@ export default function OwnerDashboard() {
   const handleDeleteItem = async (itemId) => {
     if (!confirm('Are you sure you want to remove this dish?')) return;
     try {
-      if (db.isMock()) {
-        mockDB.menu_items = mockDB.menu_items.filter(i => i.id !== itemId);
-        setMenuItems(menuItems.filter(i => i.id !== itemId));
-      } else {
-        await request(`/api/restaurants/${restaurant.id}/menu/${itemId}`, { method: 'DELETE' });
-        const mItems = await request(`/api/restaurants/${restaurant.id}/menu`);
-        setMenuItems(mItems || []);
-      }
+      await request(`/api/restaurants/${restaurant.id}/menu/${itemId}`, { method: 'DELETE' });
+      const mItems = await request(`/api/restaurants/${restaurant.id}/menu`);
+      setMenuItems(mItems || []);
     } catch (err) {
       console.error(err);
     }
@@ -411,7 +391,7 @@ export default function OwnerDashboard() {
                     </div>
                     <div>
                       <h4 className="text-sm font-extrabold text-stone-850 dark:text-white line-clamp-1">{item.name}</h4>
-                      <span className="text-xs font-black text-orange-500">${item.price.toFixed(2)}</span>
+                      <span className="text-xs font-black text-orange-500">${Number(item.price || 0).toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -438,17 +418,17 @@ export default function OwnerDashboard() {
               </div>
               <div>
                 <span className="text-[9px] uppercase font-black tracking-widest text-stone-400">Total Net Sales</span>
-                <h4 className="text-xl font-black text-stone-855 dark:text-white mt-0.5">${netSales.toFixed(2)}</h4>
+                <h4 className="text-xl font-black text-stone-800 dark:text-white mt-0.5">${netSales.toFixed(2)}</h4>
               </div>
             </div>
 
             <div className="p-6 rounded-[28px] border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/10 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center font-bold">
-                ✓
+                OK
               </div>
               <div>
                 <span className="text-[9px] uppercase font-black tracking-widest text-stone-400">Completed Orders</span>
-                <h4 className="text-xl font-black text-stone-855 dark:text-white mt-0.5">
+                <h4 className="text-xl font-black text-stone-800 dark:text-white mt-0.5">
                   {orders.filter(o => o.order_status === 'delivered').length} Orders
                 </h4>
               </div>
@@ -460,7 +440,7 @@ export default function OwnerDashboard() {
               </div>
               <div>
                 <span className="text-[9px] uppercase font-black tracking-widest text-stone-400">Platform Comm. Rate</span>
-                <h4 className="text-xl font-black text-stone-855 dark:text-white mt-0.5">{restaurant.commission_rate}%</h4>
+                <h4 className="text-xl font-black text-stone-800 dark:text-white mt-0.5">{restaurant.commission_rate}%</h4>
               </div>
             </div>
           </div>
@@ -495,7 +475,3 @@ export default function OwnerDashboard() {
     </div>
   );
 }
-
-// Help resolve db mocks in Owner UI
-const db = { isMock: () => true };
-const mockDB = { menu_items: [] };

@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "setup-db": "node setup-db.js",
+    "verify:crud": "node scripts/verify-crud.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

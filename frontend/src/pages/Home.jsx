@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Search, ChevronRight, Star, Sparkles, Plus, Check } from 'lucide-react';
+import { Search, ChevronRight, Sparkles, Plus, Check } from 'lucide-react';
 import { addToCart } from '../store/cartSlice.js';
 import { useApi } from '../hooks/useApi.js';
 
@@ -31,7 +31,10 @@ export default function Home() {
       setAiLoading(true);
       try {
         const data = await request('/api/restaurants/recommendations');
-        setAiDishes(data);
+        setAiDishes((Array.isArray(data) ? data : []).map((dish) => ({
+          ...dish,
+          price: Number(dish.price) || 0
+        })));
       } catch (e) {
         console.error(e);
       } finally {
@@ -56,7 +59,13 @@ export default function Home() {
       name: item.restaurant_name || 'Premium Bistro',
       delivery_fee: 5.00
     };
-    dispatch(addToCart({ item, restaurant: mockRestaurant }));
+    dispatch(addToCart({
+      item: {
+        ...item,
+        price: Number(item.price) || 0
+      },
+      restaurant: mockRestaurant
+    }));
     
     // Animate badge
     setAddedItems(prev => ({ ...prev, [item.id]: true }));
@@ -68,14 +77,10 @@ export default function Home() {
   return (
     <div className="space-y-16 pb-20">
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-zinc-950 text-white rounded-b-[40px] sm:rounded-b-[60px] px-4 py-16">
+      <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden text-white rounded-b-[40px] sm:rounded-b-[60px] px-4 py-16 border-b border-white/10">
         <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1600&auto=format&fit=crop&q=80"
-            className="w-full h-full object-cover opacity-25 filter blur-[2px]"
-            alt="Delicious food background"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_6%,rgba(255,169,54,0.42),transparent_10%),radial-gradient(circle_at_44%_30%,rgba(30,238,255,0.36),transparent_28%),radial-gradient(circle_at_68%_26%,rgba(30,255,120,0.34),transparent_30%),linear-gradient(180deg,rgba(0,7,16,0.1),rgba(0,0,0,0.86))]"></div>
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.78)),repeating-linear-gradient(90deg,transparent_0_54px,rgba(0,0,0,0.88)_56px_66px,transparent_70px_108px)] opacity-90"></div>
         </div>
 
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8 px-4">
@@ -203,7 +208,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 mt-4 border-t border-stone-100 dark:border-zinc-800/60">
-                  <span className="text-lg font-black text-stone-800 dark:text-white">${dish.price.toFixed(2)}</span>
+                  <span className="text-lg font-black text-stone-800 dark:text-white">${Number(dish.price || 0).toFixed(2)}</span>
                   <button
                     onClick={() => handleAddAiItem(dish)}
                     className="p-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 shadow-md active:scale-95 transition-all flex items-center gap-1"

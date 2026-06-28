@@ -92,6 +92,63 @@ router.get('/nearby', async (req, res) => {
   }
 });
 
+// GET /api/maps/nearby-hotels
+router.get('/nearby-hotels', async (req, res) => {
+  const { lat, lng, radius = 5000 } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: 'Coordinates are required' });
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
+  const searchRadius = Math.min(parseInt(radius, 10) || 5000, 10000);
+
+  if (apiKey) {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${searchRadius}&type=lodging&key=${apiKey}`;
+      const googleRes = await fetch(url);
+      const data = await googleRes.json();
+      if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
+        const hotels = (data.results || []).slice(0, 12).map(place => ({
+          id: place.place_id,
+          name: place.name,
+          address: place.vicinity,
+          latitude: place.geometry?.location?.lat,
+          longitude: place.geometry?.location?.lng,
+          rating: place.rating || null,
+          is_open: place.opening_hours?.open_now ?? null,
+          type: 'hotel'
+        }));
+        return res.json({ hotels });
+      }
+    } catch (err) {
+      console.warn('Google nearby hotels failed, falling back to OSM:', err.message);
+    }
+  }
+
+  try {
+    const delta = searchRadius / 111000;
+    const viewbox = `${longitude - delta},${latitude + delta},${longitude + delta},${latitude - delta}`;
+    const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=hotel&bounded=1&viewbox=${viewbox}&limit=12`, {
+      headers: { 'User-Agent': 'HungryHub-App/1.0' }
+    });
+    const data = await osmRes.json();
+    const hotels = (data || []).map(item => ({
+      id: String(item.place_id || item.osm_id),
+      name: item.name || item.display_name?.split(',')[0] || 'Hotel',
+      address: item.display_name,
+      latitude: parseFloat(item.lat),
+      longitude: parseFloat(item.lon),
+      rating: null,
+      is_open: null,
+      type: 'hotel'
+    }));
+    res.json({ hotels });
+  } catch (err) {
+    console.error('Nearby hotels fallback error:', err);
+    res.status(500).json({ error: 'Failed to fetch nearby hotels' });
+  }
+});
+
 // POST /api/maps/geocode
 router.post('/geocode', async (req, res) => {
   const { address } = req.body;
@@ -299,4 +356,3 @@ router.post('/zones/validate', async (req, res) => {
 });
 
 export default router;
-

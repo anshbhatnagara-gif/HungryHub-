@@ -31,7 +31,15 @@ export const useApi = () => {
           headers,
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data = {};
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = { error: text };
+          }
+        }
 
         if (!response.ok) {
           // If token expired/unauthorized, log out user

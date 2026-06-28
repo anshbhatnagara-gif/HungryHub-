@@ -6,6 +6,52 @@ import { Autocomplete, useJsApiLoader } from '@react-google-maps/api';
 import { setCredentials } from '../store/authSlice.js';
 import { GoogleLogin } from '@react-oauth/google';
 
+function ManualAddressInput({ value, onChange, placeholder = 'Enter full address manually...' }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
+    />
+  );
+}
+
+function GoogleAddressInput({ value, onChange, mapsApiKey }) {
+  const [autocomplete, setAutocomplete] = useState(null);
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-places-script',
+    googleMapsApiKey: mapsApiKey,
+    libraries: ['places']
+  });
+
+  const onPlaceChanged = () => {
+    if (!autocomplete) return;
+    onChange(autocomplete.getPlace().formatted_address || '');
+  };
+
+  if (!isLoaded) {
+    return <ManualAddressInput value={value} onChange={onChange} placeholder="Loading address search..." />;
+  }
+
+  return (
+    <Autocomplete onLoad={setAutocomplete} onPlaceChanged={onPlaceChanged}>
+      <ManualAddressInput value={value} onChange={onChange} placeholder="Search your location..." />
+    </Autocomplete>
+  );
+}
+
+function AddressInput({ value, onChange }) {
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+  if (!mapsApiKey) {
+    return <ManualAddressInput value={value} onChange={onChange} />;
+  }
+
+  return <GoogleAddressInput value={value} onChange={onChange} mapsApiKey={mapsApiKey} />;
+}
+
 export default function Signup() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -18,20 +64,6 @@ export default function Signup() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [autocomplete, setAutocomplete] = useState(null);
-
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places']
-  });
-
-  const onLoad = (autoC) => setAutocomplete(autoC);
-  const onPlaceChanged = () => {
-    if (autocomplete !== null) {
-      setAddress(autocomplete.getPlace().formatted_address || '');
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,7 +113,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-gradient-to-tr from-amber-500/5 via-stone-50 to-rose-500/5 dark:from-zinc-950 dark:to-zinc-900 transition-colors">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 transition-colors">
       <div className="w-full max-w-md p-8 rounded-3xl glass-panel-light dark:glass-panel-dark shadow-2xl">
         <div className="text-center mb-8">
           <span className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-md mb-3">
@@ -158,25 +190,7 @@ export default function Signup() {
           <div>
             <label className="text-[10px] text-stone-400 dark:text-zinc-500 font-bold uppercase tracking-wider block mb-1">Full Address (for delivery/restaurant)</label>
             <div className="relative">
-              {isLoaded ? (
-                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Search your location..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
-                  />
-                </Autocomplete>
-              ) : (
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter full address manually..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-zinc-900/50 border border-stone-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-stone-800 dark:text-white transition-all"
-                />
-              )}
+              <AddressInput value={address} onChange={setAddress} />
               <MapPin className="absolute left-3.5 top-3.5 text-stone-400 dark:text-zinc-600 z-10 pointer-events-none" size={16} />
             </div>
           </div>

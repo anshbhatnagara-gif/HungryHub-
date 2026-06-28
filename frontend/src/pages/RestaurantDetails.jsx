@@ -212,7 +212,7 @@ export default function RestaurantDetails() {
                         <h4 className="text-sm sm:text-base font-extrabold text-stone-800 dark:text-white line-clamp-1">{item.name}</h4>
                       </div>
                       <p className="text-xs text-stone-400 dark:text-zinc-500 line-clamp-2">{item.description}</p>
-                      <div className="text-sm font-black text-stone-800 dark:text-white">${item.price.toFixed(2)}</div>
+                      <div className="text-sm font-black text-stone-800 dark:text-white">${Number(item.price || 0).toFixed(2)}</div>
                     </div>
 
                     <div className="relative shrink-0 w-24 h-24">

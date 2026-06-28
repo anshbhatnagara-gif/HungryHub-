@@ -18,11 +18,12 @@ export const configureSecurity = (app) => {
     }
   }));
 
-  // Enable CORS
+  const allowedOrigin = process.env.FRONTEND_URL || '*';
   app.use(cors({
-    origin: '*', // Allow all for development & testing simplicity
+    origin: allowedOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
   }));
 
   // Limit API requests

@@ -20,7 +20,6 @@ const router = express.Router();
 router.post('/checkout', verifyToken, checkout);
 router.get('/history', verifyToken, getOrderHistory);
 router.post('/coupon/validate', verifyToken, validateCoupon);
-router.get('/:id', verifyToken, getOrderDetails);
 
 // Restaurant owner endpoints
 router.get('/restaurant/list', verifyToken, checkRole(['owner', 'admin']), restaurantGetOrders);
@@ -32,5 +31,7 @@ router.post('/rider/accept', verifyToken, checkRole(['rider', 'admin']), riderAc
 router.post('/rider/complete', verifyToken, checkRole(['rider', 'admin']), riderCompleteDelivery);
 router.get('/rider/earnings', verifyToken, checkRole(['rider', 'admin']), riderGetEarnings);
 router.post('/rider/status', verifyToken, checkRole(['rider', 'admin']), riderUpdateStatus);
+
+router.get('/:id', verifyToken, getOrderDetails);
 
 export default router;

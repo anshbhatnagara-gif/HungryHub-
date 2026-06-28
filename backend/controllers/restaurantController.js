@@ -5,7 +5,20 @@ export const getAllRestaurants = async (req, res) => {
   const { search, category } = req.query;
   try {
     const [restaurants] = await db.query('SELECT * FROM restaurants WHERE is_active = 1', []);
-    let filtered = restaurants || [];
+    const [menuItems] = await db.query('SELECT * FROM menu_items WHERE is_available = 1', []);
+    const currentHour = new Date().getHours();
+    const isOpenNow = currentHour >= 9 && currentHour < 23;
+    let filtered = (restaurants || []).map((restaurant) => {
+      const items = (menuItems || []).filter(item => Number(item.restaurant_id) === Number(restaurant.id));
+      const hasMenu = items.length > 0;
+      const nonVegCount = items.filter(item => Number(item.is_veg) === 0).length;
+      return {
+        ...restaurant,
+        is_pure_veg: hasMenu && nonVegCount === 0 ? 1 : 0,
+        delivery_time_minutes: 25 + (Number(restaurant.id) % 4) * 5,
+        is_open_now: isOpenNow ? 1 : 0
+      };
+    });
 
     if (search) {
       const term = search.toLowerCase();
@@ -59,6 +72,127 @@ export const getRestaurantMenu = async (req, res) => {
   try {
     const [items] = await db.query('SELECT * FROM menu_items WHERE restaurant_id = ? AND is_available = 1', [id]);
     res.status(200).json(items || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const createRestaurant = async (req, res) => {
+  const {
+    owner_id,
+    name,
+    description,
+    cuisine_type,
+    image_url,
+    address,
+    latitude = 12.971598,
+    longitude = 77.594562,
+    delivery_zone = null,
+    commission_rate = 10.00,
+    is_featured = 0,
+    is_active = 1
+  } = req.body;
+
+  if (!name || !address) {
+    return res.status(400).json({ error: 'Restaurant name and address are required.' });
+  }
+
+  const restaurantOwnerId = req.user.role === 'admin' && owner_id ? owner_id : req.user.id;
+
+  try {
+    const [result] = await db.query(
+      `INSERT INTO restaurants
+       (owner_id, name, description, cuisine_type, image_url, address, latitude, longitude, delivery_zone, commission_rate, is_featured, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        restaurantOwnerId,
+        name,
+        description || '',
+        cuisine_type || '',
+        image_url || '',
+        address,
+        Number(latitude),
+        Number(longitude),
+        delivery_zone,
+        Number(commission_rate),
+        is_featured ? 1 : 0,
+        is_active ? 1 : 0
+      ]
+    );
+
+    res.status(201).json({ message: 'Restaurant created successfully.', id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const canManageRestaurant = async (user, restaurantId) => {
+  if (user.role === 'admin') return true;
+  const [rests] = await db.query('SELECT id FROM restaurants WHERE id = ? AND owner_id = ?', [restaurantId, user.id]);
+  return rests && rests.length > 0;
+};
+
+export const createMenuItem = async (req, res) => {
+  const { id } = req.params;
+  const { name, description, price, image_url, category_id, is_veg = 1, is_available = 1 } = req.body;
+
+  if (!name || Number(price) <= 0) {
+    return res.status(400).json({ error: 'Dish name and a valid price are required.' });
+  }
+
+  try {
+    if (!(await canManageRestaurant(req.user, id))) {
+      return res.status(403).json({ error: 'You cannot manage this restaurant.' });
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO menu_items (restaurant_id, category_id, name, description, price, image_url, is_veg, is_available)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, category_id || null, name, description || '', Number(price), image_url || '', is_veg ? 1 : 0, is_available ? 1 : 0]
+    );
+
+    res.status(201).json({ message: 'Menu item created successfully.', id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const updateMenuItem = async (req, res) => {
+  const { id, itemId } = req.params;
+  const { name, description, price, image_url, category_id, is_veg = 1, is_available = 1 } = req.body;
+
+  if (!name || Number(price) <= 0) {
+    return res.status(400).json({ error: 'Dish name and a valid price are required.' });
+  }
+
+  try {
+    if (!(await canManageRestaurant(req.user, id))) {
+      return res.status(403).json({ error: 'You cannot manage this restaurant.' });
+    }
+
+    await db.query(
+      `UPDATE menu_items
+       SET name = ?, description = ?, price = ?, image_url = ?, category_id = ?, is_veg = ?, is_available = ?
+       WHERE id = ? AND restaurant_id = ?`,
+      [name, description || '', Number(price), image_url || '', category_id || null, is_veg ? 1 : 0, is_available ? 1 : 0, itemId, id]
+    );
+
+    res.status(200).json({ message: 'Menu item updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const deleteMenuItem = async (req, res) => {
+  const { id, itemId } = req.params;
+
+  try {
+    if (!(await canManageRestaurant(req.user, id))) {
+      return res.status(403).json({ error: 'You cannot manage this restaurant.' });
+    }
+
+    await db.query('DELETE FROM menu_items WHERE id = ? AND restaurant_id = ?', [itemId, id]);
+    res.status(200).json({ message: 'Menu item removed successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
